@@ -4,11 +4,13 @@ import type { ContentStatus } from './types/content';
 import { FIRM_NAME } from './types/content';
 import { useAuth } from './hooks/useAuth';
 import { useAggregatorContent } from './hooks/useAggregatorContent';
+import { useLiveNews } from './hooks/useLiveNews';
 import { copyToClipboard } from './utils/clipboard';
 import { resolveDetailBundle } from './utils/contentUtils';
 import { Header, type ActivePage } from './components/Header';
 import { LoginScreen } from './components/LoginScreen';
 import { TodayPage } from './components/TodayPage';
+import { LiveNewsPage } from './components/LiveNewsPage';
 import { ArchivePage } from './components/ArchivePage';
 import { DetailModal } from './components/DetailModal';
 import { Toast, type ToastMessage } from './components/Toast';
@@ -48,6 +50,8 @@ export default function App() {
     updateItemStatus,
     retry,
   } = useAggregatorContent(Boolean(user), selectedArchiveDate, activePage);
+
+  const liveNews = useLiveNews(Boolean(user), activePage === 'news');
 
   const showToast = useCallback((text: string, variant: 'success' | 'error' = 'success') => {
     if (toastTimerRef.current) {
@@ -150,6 +154,21 @@ export default function App() {
             onOpenDetail={(item) => setSelectedDetailId(item.id)}
             onRetry={retry}
             onGoToArchive={() => setActivePage('archive')}
+          />
+        ) : activePage === 'news' ? (
+          <LiveNewsPage
+            data={liveNews.data}
+            loading={liveNews.loading}
+            refreshing={liveNews.refreshing}
+            error={liveNews.error}
+            firestoreItems={allItemsForLookup}
+            drafts={liveNews.drafts}
+            generatingKeys={liveNews.generatingKeys}
+            onForceRefresh={liveNews.forceRefresh}
+            onGenerateDraft={liveNews.generateDraft}
+            onCopy={handleCopy}
+            onOpenFirestoreDetail={(item) => setSelectedDetailId(item.id)}
+            onShowToast={showToast}
           />
         ) : (
           <ArchivePage

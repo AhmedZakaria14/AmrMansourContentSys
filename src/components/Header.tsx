@@ -1,13 +1,19 @@
 import { LogOut, Scale } from 'lucide-react';
 import { FIRM_NAME } from '../types/content';
 
-export type ActivePage = 'today' | 'archive';
+export type ActivePage = 'today' | 'news' | 'archive';
 
 interface HeaderProps {
   activePage: ActivePage;
   onNavigate: (page: ActivePage) => void;
   onSignOut: () => void;
 }
+
+const NAV_ITEMS: Array<{ id: ActivePage; label: string }> = [
+  { id: 'today', label: 'الرئيسية' },
+  { id: 'news', label: 'نشرة الأخبار' },
+  { id: 'archive', label: 'الأرشيف' },
+];
 
 export function Header({ activePage, onNavigate, onSignOut }: HeaderProps) {
   return (
@@ -32,42 +38,28 @@ export function Header({ activePage, onNavigate, onSignOut }: HeaderProps) {
 
         {/* Zone 2: Clean typographic navigation links (desktop) */}
         <nav aria-label="التنقل الرئيسي" className="hidden md:flex items-center gap-7 shrink-0">
-          <button
-            type="button"
-            onClick={() => onNavigate('today')}
-            aria-current={activePage === 'today' ? 'page' : undefined}
-            className={`relative py-2 text-sm font-medium transition-colors whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#C9A45C] rounded ${
-              activePage === 'today'
-                ? 'text-[#E7C986]'
-                : 'text-slate-300 hover:text-white'
-            }`}
-          >
-            الرئيسية
-            {activePage === 'today' && (
-              <span
-                aria-hidden="true"
-                className="absolute inset-x-0 -bottom-[17px] h-0.5 bg-[#C9A45C]"
-              />
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={() => onNavigate('archive')}
-            aria-current={activePage === 'archive' ? 'page' : undefined}
-            className={`relative py-2 text-sm font-medium transition-colors whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#C9A45C] rounded ${
-              activePage === 'archive'
-                ? 'text-[#E7C986]'
-                : 'text-slate-300 hover:text-white'
-            }`}
-          >
-            الأرشيف
-            {activePage === 'archive' && (
-              <span
-                aria-hidden="true"
-                className="absolute inset-x-0 -bottom-[17px] h-0.5 bg-[#C9A45C]"
-              />
-            )}
-          </button>
+          {NAV_ITEMS.map((item) => {
+            const active = activePage === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => onNavigate(item.id)}
+                aria-current={active ? 'page' : undefined}
+                className={`relative py-2 text-sm font-medium transition-colors whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#C9A45C] rounded ${
+                  active ? 'text-[#E7C986]' : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                {item.label}
+                {active && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute inset-x-0 -bottom-[17px] h-0.5 bg-[#C9A45C]"
+                  />
+                )}
+              </button>
+            );
+          })}
         </nav>
 
         {/* Zone 3: Single primary header action (Sign out) */}
@@ -86,32 +78,26 @@ export function Header({ activePage, onNavigate, onSignOut }: HeaderProps) {
       {/* Mobile navigation strip (in-flow, non-sticky) */}
       <nav
         aria-label="التنقل على الجوال"
-        className="md:hidden border-t border-white/10 bg-[#0E2038] px-4 flex items-center gap-6"
+        className="md:hidden border-t border-white/10 bg-[#0E2038] px-4 flex items-center gap-6 overflow-x-auto"
       >
-        <button
-          type="button"
-          onClick={() => onNavigate('today')}
-          aria-current={activePage === 'today' ? 'page' : undefined}
-          className={`py-3 min-h-[44px] text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-            activePage === 'today'
-              ? 'border-[#C9A45C] text-[#E7C986]'
-              : 'border-transparent text-slate-300'
-          }`}
-        >
-          الرئيسية
-        </button>
-        <button
-          type="button"
-          onClick={() => onNavigate('archive')}
-          aria-current={activePage === 'archive' ? 'page' : undefined}
-          className={`py-3 min-h-[44px] text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-            activePage === 'archive'
-              ? 'border-[#C9A45C] text-[#E7C986]'
-              : 'border-transparent text-slate-300'
-          }`}
-        >
-          الأرشيف
-        </button>
+        {NAV_ITEMS.map((item) => {
+          const active = activePage === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => onNavigate(item.id)}
+              aria-current={active ? 'page' : undefined}
+              className={`py-3 min-h-[44px] text-sm font-medium border-b-2 transition-colors whitespace-nowrap shrink-0 ${
+                active
+                  ? 'border-[#C9A45C] text-[#E7C986]'
+                  : 'border-transparent text-slate-300'
+              }`}
+            >
+              {item.label}
+            </button>
+          );
+        })}
       </nav>
     </header>
   );

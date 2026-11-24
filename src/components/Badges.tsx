@@ -53,3 +53,19 @@ export function SampleDataBadge() {
     </span>
   );
 }
+
+export function LiveSourceBadge({ isApproved }: { isApproved: boolean }) {
+  if (isApproved) {
+    return (
+      <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-semibold rounded border border-[#86EFAC] bg-[#DCFCE7] text-[#166534] whitespace-nowrap shrink-0">
+        معتمد من الأجريجاتور
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center px-2.5 py-0.5 text-xs font-semibold rounded border border-[#BFDBFE] bg-[#EFF6FF] text-[#1E3A8A] whitespace-nowrap shrink-0">
+      مباشر
+    </span>
+  );
+}
+

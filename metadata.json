@@ -2,5 +2,5 @@
   "name": "مؤسسة عمرو منصور للمحاماة والاستشارات القانونية — لوحة المحتوى القانوني",
   "description": "لوحة تحكم يومية لإدارة المحتوى القانوني والأخبار المصرية وبوستات فيسبوك وسكربتات الفيديو لمؤسسة عمرو منصور للمحاماة والاستشارات القانونية.",
   "requestFramePermissions": [],
-  "majorCapabilities": []
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

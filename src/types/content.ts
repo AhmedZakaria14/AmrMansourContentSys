@@ -78,3 +78,54 @@ export const STATUS_LABELS: Record<ContentStatus, string> = {
 };
 
 export const FIRM_NAME = 'مؤسسة عمرو منصور للمحاماة والاستشارات القانونية';
+
+export type DraftType = 'post' | 'script';
+
+export interface LiveNewsItem {
+  id: string;
+  story_id: string;
+  title: string;
+  link: string;
+  description: string;
+  source_name: string;
+  source_id: string;
+  pub_date: string;
+  published_ms: number;
+  from_trends: boolean;
+  approx_traffic?: string;
+  legal_score: number;
+  category: ContentCategory;
+  is_legal: boolean;
+  legal_angle: string;
+  is_trending: boolean;
+}
+
+export interface FeedFetchStatus {
+  id: string;
+  name: string;
+  url: string;
+  ok: boolean;
+  count: number;
+  error?: string;
+}
+
+export interface LiveNewsResponse {
+  items: LiveNewsItem[];
+  trendingTerms: string[];
+  feeds: FeedFetchStatus[];
+  fetchedAt: string;
+  cached: boolean;
+  scoredBy: 'gemini' | 'keyword_fallback';
+  scoringWarning?: string;
+  totalFetched: number;
+}
+
+export interface AppDraft {
+  id: string;
+  story_id: string;
+  draft_type: DraftType;
+  text: string;
+  duration_sec?: number;
+  created_at: string;
+}
+
