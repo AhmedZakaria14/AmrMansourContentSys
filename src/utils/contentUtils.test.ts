@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  ADMIN_AUTH_EMAIL,
   countCharacters,
   filterArchiveContent,
   getAvailableDates,
@@ -9,6 +10,7 @@ import {
   normalizeArabicSearch,
   normalizeFirestoreDocument,
   resolveDetailBundle,
+  resolveUsernameToEmail,
   sanitizeExternalUrl,
   sortItemsByCreatedAtDesc,
   validateLoginForm,
@@ -186,23 +188,33 @@ test('isValidContentStatus validates allowed Firestore workflow statuses strictl
   assert.equal(isValidContentStatus(null), false);
 });
 
-test('validateLoginForm rejects invalid/empty fields and accepts valid credentials', () => {
+test('resolveUsernameToEmail maps admin username to firm auth email and preserves full emails', () => {
+  assert.equal(resolveUsernameToEmail('admin'), ADMIN_AUTH_EMAIL);
+  assert.equal(resolveUsernameToEmail(' ADMIN '), ADMIN_AUTH_EMAIL);
+  assert.equal(resolveUsernameToEmail('admin@amromansour-law.eg'), 'admin@amromansour-law.eg');
+  assert.equal(resolveUsernameToEmail(''), '');
+});
+
+test('validateLoginForm validates username and password cleanly', () => {
   const emptyResult = validateLoginForm('', '');
   assert.equal(emptyResult.valid, false);
-  assert.ok(emptyResult.emailError);
+  assert.ok(emptyResult.usernameError);
   assert.ok(emptyResult.passwordError);
 
-  const badEmail = validateLoginForm('not-an-email', '123456');
-  assert.equal(badEmail.valid, false);
-  assert.ok(badEmail.emailError);
-  assert.equal(badEmail.passwordError, undefined);
+  const invalidChars = validateLoginForm('bad user!', '123456');
+  assert.equal(invalidChars.valid, false);
+  assert.ok(invalidChars.usernameError);
+  assert.equal(invalidChars.passwordError, undefined);
 
-  const shortPassword = validateLoginForm('lawyer@mansourlaw.eg', '123');
+  const shortPassword = validateLoginForm('admin', '123');
   assert.equal(shortPassword.valid, false);
   assert.ok(shortPassword.passwordError);
 
-  const valid = validateLoginForm('lawyer@mansourlaw.eg', 'SecurePass123');
-  assert.equal(valid.valid, true);
+  const validUsername = validateLoginForm('admin', 'SecurePass123');
+  assert.equal(validUsername.valid, true);
+
+  const validEmail = validateLoginForm('admin@amromansour-law.eg', 'SecurePass123');
+  assert.equal(validEmail.valid, true);
 });
 
 test('countCharacters trims whitespace and handles null safely', () => {

@@ -1,44 +1,39 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  GoogleAuthProvider,
   onAuthStateChanged,
   signInWithEmailAndPassword,
-  signInWithPopup,
   signOut as firebaseSignOut,
   type AuthError,
 } from 'firebase/auth';
 import { auth, isFirebaseConfigured } from '../firebase-config';
+import { ADMIN_AUTH_EMAIL, resolveUsernameToEmail } from '../utils/contentUtils';
 
 export interface AuthUser {
   uid: string;
+  username: string;
   email: string;
   isDemoSession: boolean;
 }
 
-const DEMO_SESSION_KEY = 'amro_mansour_demo_auth_email';
+const DEMO_SESSION_KEY = 'amro_mansour_demo_auth_user';
 
 function translateAuthError(error: unknown): string {
   const code = (error as AuthError)?.code ?? '';
   switch (code) {
     case 'auth/invalid-email':
-      return 'صيغة البريد الإلكتروني غير صحيحة.';
+      return 'صيغة اسم المستخدم غير صحيحة.';
     case 'auth/user-disabled':
       return 'تم تعطيل هذا الحساب. يرجى مراجعة إدارة المؤسسة.';
     case 'auth/user-not-found':
     case 'auth/wrong-password':
     case 'auth/invalid-credential':
-      return 'البريد الإلكتروني أو كلمة المرور غير صحيحة.';
+      return 'اسم المستخدم أو كلمة المرور غير صحيحة.';
     case 'auth/too-many-requests':
       return 'تم تجاوز عدد محاولات الدخول المسموح بها. يرجى المحاولة لاحقاً.';
     case 'auth/network-request-failed':
       return 'تعذر الاتصال بالخادم. يرجى التحقق من اتصال الإنترنت.';
     case 'auth/operation-not-allowed':
-      return 'تسجيل الدخول بالبريد الإلكتروني غير مفعّل بعد في Firebase Authentication. يمكنك الدخول بحساب Google أو تفعيل Email/Password من لوحة Firebase.';
-    case 'auth/popup-closed-by-user':
-    case 'auth/cancelled-popup-request':
-      return 'تم إلغاء نافذة تسجيل الدخول بحساب Google.';
-    case 'auth/popup-blocked':
-      return 'تم حظر النافذة المنبثقة من المتصفح. يرجى السماح بالنوافذ المنبثقة والمحاولة مجدداً.';
+      return 'تسجيل الدخول بكلمة المرور غير مفعّل بعد في Firebase Authentication. يرجى تفعيل Email/Password وإضافة حساب admin@amromansour-law.eg من لوحة Firebase.';
     default:
       return 'حدث خطأ أثناء تسجيل الدخول. يرجى المحاولة مرة أخرى.';
   }
@@ -53,14 +48,25 @@ export function useAuth() {
 
   useEffect(() => {
     if (configured && auth) {
-      const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-        if (firebaseUser) {
+      const activeAuth = auth;
+      const unsubscribe = onAuthStateChanged(activeAuth, (firebaseUser) => {
+        // Enforce single password-authenticated admin account on client as well
+        const email = (firebaseUser?.email ?? '').toLowerCase();
+        const hasPasswordProvider = firebaseUser?.providerData?.some(
+          (p) => p.providerId === 'password'
+        );
+
+        if (firebaseUser && email === ADMIN_AUTH_EMAIL && hasPasswordProvider) {
           setUser({
             uid: firebaseUser.uid,
-            email: firebaseUser.email ?? 'عضو المؤسسة',
+            username: 'admin',
+            email,
             isDemoSession: false,
           });
         } else {
+          if (firebaseUser) {
+            void firebaseSignOut(activeAuth);
+          }
           setUser(null);
         }
         setAuthLoading(false);
@@ -68,22 +74,23 @@ export function useAuth() {
       return () => unsubscribe();
     }
 
-    // Preview mode when Firebase credentials haven't been configured yet
+    // Preview mode only when Firebase config placeholders have not been filled
     try {
       const params = new URLSearchParams(window.location.search);
-      const savedEmail = window.sessionStorage.getItem(DEMO_SESSION_KEY);
-      if (savedEmail) {
+      const savedUser = window.sessionStorage.getItem(DEMO_SESSION_KEY);
+      if (savedUser) {
         setUser({
           uid: 'demo-user',
-          email: savedEmail,
+          username: savedUser,
+          email: resolveUsernameToEmail(savedUser),
           isDemoSession: true,
         });
       } else if (params.get('autostart') === '1') {
-        const previewEmail = 'office@amromansour-law.eg';
-        window.sessionStorage.setItem(DEMO_SESSION_KEY, previewEmail);
+        window.sessionStorage.setItem(DEMO_SESSION_KEY, 'admin');
         setUser({
           uid: 'demo-user',
-          email: previewEmail,
+          username: 'admin',
+          email: ADMIN_AUTH_EMAIL,
           isDemoSession: true,
         });
       }
@@ -94,25 +101,32 @@ export function useAuth() {
   }, [configured]);
 
   const signIn = useCallback(
-    async (email: string, password: string): Promise<boolean> => {
+    async (username: string, password: string): Promise<boolean> => {
       setAuthError(null);
       setSubmitting(true);
 
       try {
+        const resolvedEmail = resolveUsernameToEmail(username);
+
         if (configured && auth) {
-          await signInWithEmailAndPassword(auth, email.trim(), password);
+          if (resolvedEmail !== ADMIN_AUTH_EMAIL) {
+            setAuthError('اسم المستخدم أو كلمة المرور غير صحيحة.');
+            return false;
+          }
+          await signInWithEmailAndPassword(auth, resolvedEmail, password);
           return true;
         }
 
-        const normalizedEmail = email.trim();
+        const normalizedUser = username.trim().toLowerCase();
         try {
-          window.sessionStorage.setItem(DEMO_SESSION_KEY, normalizedEmail);
+          window.sessionStorage.setItem(DEMO_SESSION_KEY, normalizedUser);
         } catch {
           // Ignore storage error
         }
         setUser({
           uid: 'demo-user',
-          email: normalizedEmail,
+          username: normalizedUser,
+          email: resolvedEmail,
           isDemoSession: true,
         });
         return true;
@@ -126,35 +140,18 @@ export function useAuth() {
     [configured]
   );
 
-  const signInWithGoogle = useCallback(async (): Promise<boolean> => {
-    if (!configured || !auth) return false;
-    setAuthError(null);
-    setSubmitting(true);
-
-    try {
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
-      return true;
-    } catch (err) {
-      setAuthError(translateAuthError(err));
-      return false;
-    } finally {
-      setSubmitting(false);
-    }
-  }, [configured]);
-
   const signInDemoPreview = useCallback(() => {
     if (configured) return;
     setAuthError(null);
-    const previewEmail = 'office@amromansour-law.eg';
     try {
-      window.sessionStorage.setItem(DEMO_SESSION_KEY, previewEmail);
+      window.sessionStorage.setItem(DEMO_SESSION_KEY, 'admin');
     } catch {
       // Ignore storage error
     }
     setUser({
       uid: 'demo-user',
-      email: previewEmail,
+      username: 'admin',
+      email: ADMIN_AUTH_EMAIL,
       isDemoSession: true,
     });
   }, [configured]);
@@ -182,7 +179,6 @@ export function useAuth() {
     submitting,
     isFirebaseConfigured: configured,
     signIn,
-    signInWithGoogle,
     signInDemoPreview,
     signOut,
     clearAuthError,

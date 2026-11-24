@@ -7,8 +7,13 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    function isSignedIn() {
-      return request.auth != null;
+    // Only the law firm's single password-authenticated admin account
+    // (username "admin" -> admin@amromansour-law.eg) is authorized.
+    // Google Sign-In and all other accounts are rejected at the database level.
+    function isFirmAdmin() {
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider == 'password'
+        && request.auth.token.email == 'admin@amromansour-law.eg';
     }
 
     function isValidId(id) {
@@ -31,12 +36,12 @@ service cloud.firestore {
     }
 
     // External aggregator writes via Firebase Admin SDK (bypasses rules).
-    // Signed-in law-firm users may only read aggregator_content and update ONLY "status".
+    // Only the authenticated "admin" user may read aggregator_content and update ONLY "status".
     match /aggregator_content/{docId} {
-      allow get: if isSignedIn() && isValidId(docId);
-      allow list: if isSignedIn();
+      allow get: if isFirmAdmin() && isValidId(docId);
+      allow list: if isFirmAdmin();
 
-      allow update: if isSignedIn()
+      allow update: if isFirmAdmin()
         && isValidId(docId)
         && isValidStatusUpdate(incoming())
         && incoming().diff(existing()).affectedKeys().hasOnly(['status']);

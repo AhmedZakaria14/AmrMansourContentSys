@@ -21,7 +21,6 @@ export default function App() {
     submitting,
     isFirebaseConfigured,
     signIn,
-    signInWithGoogle,
     signInDemoPreview,
     signOut,
     clearAuthError,
@@ -121,7 +120,6 @@ export default function App() {
         authError={authError}
         submitting={submitting}
         onSignIn={signIn}
-        onGoogleSignIn={signInWithGoogle}
         onDemoPreview={signInDemoPreview}
         onClearError={clearAuthError}
       />

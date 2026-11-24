@@ -358,21 +358,42 @@ export function countCharacters(text?: string | null): number {
   return text.trim().length;
 }
 
+export const ADMIN_USERNAME = 'admin';
+export const ADMIN_AUTH_DOMAIN = 'amromansour-law.eg';
+export const ADMIN_AUTH_EMAIL = `${ADMIN_USERNAME}@${ADMIN_AUTH_DOMAIN}`;
+
 /**
- * Validates login form inputs and returns Arabic error messages when invalid.
+ * Maps a short username (e.g. "admin") to its Firebase Email/Password identity
+ * ("admin@amromansour-law.eg"), or passes through an explicit email address.
+ */
+export function resolveUsernameToEmail(usernameOrEmail: string): string {
+  const trimmed = usernameOrEmail.trim().toLowerCase();
+  if (!trimmed) return '';
+  if (trimmed.includes('@')) {
+    return trimmed;
+  }
+  return `${trimmed}@${ADMIN_AUTH_DOMAIN}`;
+}
+
+/**
+ * Validates login form inputs (username or email + password) and returns Arabic error messages.
  */
 export function validateLoginForm(
-  email: string,
+  username: string,
   password: string
-): { valid: boolean; emailError?: string; passwordError?: string } {
-  const trimmedEmail = email.trim();
-  let emailError: string | undefined;
+): { valid: boolean; usernameError?: string; passwordError?: string } {
+  const trimmedUsername = username.trim();
+  let usernameError: string | undefined;
   let passwordError: string | undefined;
 
-  if (!trimmedEmail) {
-    emailError = 'يرجى إدخال البريد الإلكتروني';
-  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-    emailError = 'صيغة البريد الإلكتروني غير صحيحة';
+  if (!trimmedUsername) {
+    usernameError = 'يرجى إدخال اسم المستخدم';
+  } else if (trimmedUsername.includes('@')) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedUsername)) {
+      usernameError = 'صيغة اسم المستخدم أو البريد الإلكتروني غير صحيحة';
+    }
+  } else if (!/^[a-zA-Z0-9._-]{2,64}$/.test(trimmedUsername)) {
+    usernameError = 'اسم المستخدم يجب أن يحتوي على أحرف أو أرقام إنجليزية فقط';
   }
 
   if (!password) {
@@ -382,8 +403,8 @@ export function validateLoginForm(
   }
 
   return {
-    valid: !emailError && !passwordError,
-    emailError,
+    valid: !usernameError && !passwordError,
+    usernameError,
     passwordError,
   };
 }

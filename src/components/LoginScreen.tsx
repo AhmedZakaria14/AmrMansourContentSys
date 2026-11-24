@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Eye, EyeOff, Lock, Mail, Scale, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, Lock, User, Scale, AlertCircle } from 'lucide-react';
 import { FIRM_NAME } from '../types/content';
 import { validateLoginForm } from '../utils/contentUtils';
 
@@ -7,8 +7,7 @@ interface LoginScreenProps {
   isFirebaseConfigured: boolean;
   authError: string | null;
   submitting: boolean;
-  onSignIn: (email: string, password: string) => Promise<boolean>;
-  onGoogleSignIn: () => Promise<boolean>;
+  onSignIn: (username: string, password: string) => Promise<boolean>;
   onDemoPreview: () => void;
   onClearError: () => void;
 }
@@ -18,29 +17,28 @@ export function LoginScreen({
   authError,
   submitting,
   onSignIn,
-  onGoogleSignIn,
   onDemoPreview,
   onClearError,
 }: LoginScreenProps) {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [emailError, setEmailError] = useState<string | undefined>();
+  const [usernameError, setUsernameError] = useState<string | undefined>();
   const [passwordError, setPasswordError] = useState<string | undefined>();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     onClearError();
 
-    const validation = validateLoginForm(email, password);
-    setEmailError(validation.emailError);
+    const validation = validateLoginForm(username, password);
+    setUsernameError(validation.usernameError);
     setPasswordError(validation.passwordError);
 
     if (!validation.valid) {
       return;
     }
 
-    await onSignIn(email, password);
+    await onSignIn(username, password);
   };
 
   return (
@@ -92,7 +90,7 @@ export function LoginScreen({
           <div className="mb-6">
             <h2 className="text-xl font-bold text-[#0B192C]">تسجيل الدخول</h2>
             <p className="text-sm text-[#475569] mt-1.5">
-              أدخل البريد الإلكتروني وكلمة المرور للوصول إلى لوحة المحتوى القانوني.
+              أدخل اسم المستخدم وكلمة المرور للوصول إلى لوحة المحتوى القانوني.
             </p>
           </div>
 
@@ -107,8 +105,8 @@ export function LoginScreen({
                 >
                   src/firebase-config.ts
                 </code>
-                . يمكنك تسجيل الدخول بأي بريد وكلمة مرور صحيحة أو استخدام زر المعاينة أدناه لاستعراض
-                الواجهة بالبيانات التجريبية.
+                . يمكنك تسجيل الدخول أو استخدام زر المعاينة أدناه لاستعراض الواجهة بالبيانات
+                التجريبية.
               </p>
             </div>
           )}
@@ -126,39 +124,39 @@ export function LoginScreen({
           <form onSubmit={handleSubmit} noValidate className="space-y-4">
             <div>
               <label
-                htmlFor="login-email"
+                htmlFor="login-username"
                 className="block text-sm font-medium text-[#1E293B] mb-1.5"
               >
-                البريد الإلكتروني
+                اسم المستخدم
               </label>
               <div className="relative">
-                <Mail
+                <User
                   className="w-4 h-4 text-[#64748B] absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
                   aria-hidden="true"
                 />
                 <input
-                  id="login-email"
-                  name="email"
-                  type="email"
+                  id="login-username"
+                  name="username"
+                  type="text"
                   dir="ltr"
-                  autoComplete="email"
-                  value={email}
+                  autoComplete="username"
+                  value={username}
                   onChange={(e) => {
-                    setEmail(e.target.value);
-                    if (emailError) setEmailError(undefined);
+                    setUsername(e.target.value);
+                    if (usernameError) setUsernameError(undefined);
                     if (authError) onClearError();
                   }}
-                  placeholder="name@amromansour-law.eg"
-                  aria-invalid={Boolean(emailError)}
-                  aria-describedby={emailError ? 'login-email-error' : undefined}
+                  placeholder="admin"
+                  aria-invalid={Boolean(usernameError)}
+                  aria-describedby={usernameError ? 'login-username-error' : undefined}
                   className={`w-full pr-10 pl-3.5 py-2.5 min-h-[44px] text-sm text-left bg-white border rounded-lg text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none focus:ring-2 focus:ring-[#0B192C]/20 focus:border-[#0B192C] ${
-                    emailError ? 'border-[#DC2626]' : 'border-[#CBD5E1]'
+                    usernameError ? 'border-[#DC2626]' : 'border-[#CBD5E1]'
                   }`}
                 />
               </div>
-              {emailError && (
-                <p id="login-email-error" className="mt-1.5 text-xs text-[#DC2626]">
-                  {emailError}
+              {usernameError && (
+                <p id="login-username-error" className="mt-1.5 text-xs text-[#DC2626]">
+                  {usernameError}
                 </p>
               )}
             </div>
@@ -223,36 +221,7 @@ export function LoginScreen({
             </button>
           </form>
 
-          {isFirebaseConfigured ? (
-            <div className="mt-5 pt-5 border-t border-[#E2E8F0]">
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={() => void onGoogleSignIn()}
-                className="w-full inline-flex items-center justify-center gap-2.5 py-2.5 px-4 min-h-[44px] bg-white hover:bg-[#F8FAFC] text-[#0B192C] border border-[#CBD5E1] text-sm font-semibold rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0B192C] disabled:opacity-60"
-              >
-                <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
-                  <path
-                    fill="#4285F4"
-                    d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.29v3.09C3.26 21.3 7.31 24 12 24z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M5.27 14.29c-.25-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.98-3.09z"
-                  />
-                  <path
-                    fill="#EA4335"
-                    d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.98 3.09c.95-2.85 3.6-4.96 6.73-4.96z"
-                  />
-                </svg>
-                <span>تسجيل الدخول بحساب Google</span>
-              </button>
-            </div>
-          ) : (
+          {!isFirebaseConfigured && (
             <div className="mt-5 pt-5 border-t border-[#E2E8F0]">
               <button
                 type="button"
