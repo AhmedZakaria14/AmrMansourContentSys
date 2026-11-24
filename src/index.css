@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "IBM Plex Sans Arabic", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --color-navy-950: #07111f;
+  --color-navy-900: #0b192c;
+  --color-navy-800: #132944;
+  --color-navy-700: #1e3a5f;
+  --color-gold-600: #9a7432;
+  --color-gold-500: #b8924a;
+  --color-gold-400: #c9a45c;
+  --color-gold-100: #f7f1e3;
+  --color-gold-50: #fbf8f1;
+}
+
+@layer base {
+  html {
+    font-family: "IBM Plex Sans Arabic", system-ui, -apple-system, sans-serif;
+    scroll-behavior: smooth;
+  }
+
+  button:not(:disabled),
+  a[href] {
+    cursor: pointer;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}

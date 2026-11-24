@@ -1,0 +1,106 @@
+{
+  "entities": {
+    "AggregatorContent": {
+      "title": "AggregatorContent",
+      "description": "A daily legal news topic, ready-made Facebook post, or short video script written by the external AI aggregator system via Firebase Admin SDK and managed by law firm staff.",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Headline of the legal news topic, post, or video script.",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "summary": {
+          "type": "string",
+          "description": "Two-line Arabic summary of the news item.",
+          "maxLength": 2000
+        },
+        "legal_angle": {
+          "type": "string",
+          "description": "Explanation of why this news topic matters legally in Egypt.",
+          "maxLength": 3000
+        },
+        "category": {
+          "type": "string",
+          "description": "Editorial legal category.",
+          "enum": [
+            "قضية رأي عام",
+            "حكم محكمة",
+            "قانون جديد",
+            "قرار رسمي",
+            "تريند"
+          ]
+        },
+        "type": {
+          "type": "string",
+          "description": "Content item type: topic, post, or script.",
+          "enum": ["topic", "post", "script"]
+        },
+        "topic_id": {
+          "type": "string",
+          "description": "Optional parent topic document ID linking a post or script to its topic.",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "post_text": {
+          "type": "string",
+          "description": "Full ready-to-publish Facebook post text (only when type = post).",
+          "maxLength": 10000
+        },
+        "script_text": {
+          "type": "string",
+          "description": "Full spoken short-video script text (only when type = script).",
+          "maxLength": 10000
+        },
+        "duration_sec": {
+          "type": "number",
+          "description": "Estimated speaking duration in seconds (only when type = script)."
+        },
+        "source_name": {
+          "type": "string",
+          "description": "Name of the Egyptian news source.",
+          "maxLength": 200
+        },
+        "source_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL link to the original news article.",
+          "maxLength": 2000
+        },
+        "status": {
+          "type": "string",
+          "description": "Editorial workflow status updated by signed-in firm staff.",
+          "enum": ["draft", "approved", "published"],
+          "maxLength": 16
+        },
+        "content_date": {
+          "type": "string",
+          "description": "Africa/Cairo calendar date (YYYY-MM-DD) this content belongs to.",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "maxLength": 10
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server-written Firestore Timestamp."
+        }
+      },
+      "required": [
+        "title",
+        "category",
+        "type",
+        "status",
+        "content_date"
+      ]
+    }
+  },
+  "firestore": {
+    "/aggregator_content/{docId}": {
+      "schema": {
+        "$ref": "#/entities/AggregatorContent"
+      },
+      "description": "Daily legal topics, Facebook posts, and video scripts written server-side by the external aggregator and read/status-updated by authenticated firm members."
+    }
+  }
+}

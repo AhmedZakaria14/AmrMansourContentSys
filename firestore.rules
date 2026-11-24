@@ -1,0 +1,47 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidStatusUpdate(data) {
+      return data.status is string
+        && data.status.size() > 0
+        && data.status.size() <= 16
+        && data.status in ['draft', 'approved', 'published'];
+    }
+
+    // External aggregator writes via Firebase Admin SDK (bypasses rules).
+    // Signed-in law-firm users may only read aggregator_content and update ONLY "status".
+    match /aggregator_content/{docId} {
+      allow get: if isSignedIn() && isValidId(docId);
+      allow list: if isSignedIn();
+
+      allow update: if isSignedIn()
+        && isValidId(docId)
+        && isValidStatusUpdate(incoming())
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status']);
+
+      allow create, delete: if false;
+    }
+  }
+}
