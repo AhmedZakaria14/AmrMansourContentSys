@@ -2,7 +2,7 @@
   "entities": {
     "AggregatorContent": {
       "title": "AggregatorContent",
-      "description": "A daily legal news topic, ready-made Facebook post, or short video script written by the external AI aggregator system via Firebase Admin SDK and managed by law firm staff.",
+      "description": "A daily legal news topic, ready-made Facebook post, or short video script written by the external AI aggregator system via Firebase Admin SDK; read and status-updated only by the single password-authenticated firm admin.",
       "type": "object",
       "properties": {
         "title": {
@@ -70,7 +70,7 @@
         },
         "status": {
           "type": "string",
-          "description": "Editorial workflow status updated by the authenticated firm admin.",
+          "description": "Editorial workflow status; the only field updatable by the single password-authenticated firm admin.",
           "enum": ["draft", "approved", "published"],
           "maxLength": 16
         },
@@ -123,13 +123,13 @@
       "schema": {
         "$ref": "#/entities/AggregatorContent"
       },
-      "description": "Daily legal topics, Facebook posts, and video scripts written server-side by the external aggregator and read/status-updated by the authenticated admin."
+      "description": "Daily legal topics, Facebook posts, and video scripts written server-side by the external aggregator via Admin SDK; read and status-only updated by the single password-authenticated admin (client create/delete forbidden)."
     },
     "/aggregator_dates/{dateId}": {
       "schema": {
         "$ref": "#/entities/AggregatorDateIndex"
       },
-      "description": "Lightweight per-day date index (one document per YYYY-MM-DD) read by the authenticated admin to populate the archive dates sidebar without scanning aggregator_content."
+      "description": "Lightweight per-day date index (one document per YYYY-MM-DD) written server-side by the external aggregator; read-only for the single password-authenticated admin (client writes forbidden) to populate the archive dates sidebar without scanning aggregator_content."
     }
   }
 }

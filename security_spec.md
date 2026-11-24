@@ -3,7 +3,7 @@
 ## 1. Data Invariants
 
 1. **Server-Side Ingestion Only**: Documents in `aggregator_content` and `aggregator_dates` are written exclusively by the external AI aggregator via Firebase Admin SDK (which bypasses client security rules). Client SDKs may NEVER `create` or `delete` documents in `aggregator_content`, and may NEVER `create`, `update`, or `delete` documents in `aggregator_dates`.
-2. **Single Password-Authenticated Admin Only**: Unauthenticated requests and any account other than the password-authenticated `admin` account (`admin@amromansour-law.eg`) are denied for every operation (`get`, `list`, `create`, `update`, `delete`) across the entire database.
+2. **Single Password-Authenticated Admin Only**: Authentication is strictly limited to one Email/Password admin account (username `admin` → `admin@amromansour-law.eg`). There is **no Google Sign-In**, **no self-registration**, and **no multiple user roles**. Unauthenticated requests and any other account or provider are denied for every operation (`get`, `list`, `create`, `update`, `delete`) across the entire database.
 3. **Status-Only Client Mutation**: The authenticated `admin` user may ONLY update the `status` field of an existing `aggregator_content/{docId}` document, and only to one of `'draft'`, `'approved'`, or `'published'`.
 4. **No PII Storage**: `aggregator_content` and `aggregator_dates` store only public news headlines, legal commentary, Facebook posts, video scripts, and daily counts for the law firm—never personal emails, phone numbers, or private user profiles.
 5. **Default-Deny Catch-All**: Any path outside `/aggregator_content/{docId}` and `/aggregator_dates/{dateId}` is denied for both `read` and `write`.
