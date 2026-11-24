@@ -70,7 +70,7 @@
         },
         "status": {
           "type": "string",
-          "description": "Editorial workflow status updated by signed-in firm staff.",
+          "description": "Editorial workflow status updated by the authenticated firm admin.",
           "enum": ["draft", "approved", "published"],
           "maxLength": 16
         },
@@ -93,6 +93,29 @@
         "status",
         "content_date"
       ]
+    },
+    "AggregatorDateIndex": {
+      "title": "AggregatorDateIndex",
+      "description": "Daily index document maintained by the external aggregator (document ID = YYYY-MM-DD) storing the content_date, item count, and updated_at timestamp.",
+      "type": "object",
+      "properties": {
+        "content_date": {
+          "type": "string",
+          "description": "Africa/Cairo calendar date (YYYY-MM-DD).",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "maxLength": 10
+        },
+        "count": {
+          "type": "number",
+          "description": "Total number of aggregator_content documents for this date."
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server-written Firestore Timestamp of the last update for this day."
+        }
+      },
+      "required": ["content_date", "count"]
     }
   },
   "firestore": {
@@ -100,7 +123,13 @@
       "schema": {
         "$ref": "#/entities/AggregatorContent"
       },
-      "description": "Daily legal topics, Facebook posts, and video scripts written server-side by the external aggregator and read/status-updated by authenticated firm members."
+      "description": "Daily legal topics, Facebook posts, and video scripts written server-side by the external aggregator and read/status-updated by the authenticated admin."
+    },
+    "/aggregator_dates/{dateId}": {
+      "schema": {
+        "$ref": "#/entities/AggregatorDateIndex"
+      },
+      "description": "Lightweight per-day date index (one document per YYYY-MM-DD) read by the authenticated admin to populate the archive dates sidebar without scanning aggregator_content."
     }
   }
 }

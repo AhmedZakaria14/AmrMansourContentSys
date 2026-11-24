@@ -33,6 +33,7 @@ export default function App() {
   const toastTimerRef = useRef<number | null>(null);
 
   const {
+    todayDate,
     todayItems,
     archiveItems,
     allItemsForLookup,
@@ -46,7 +47,7 @@ export default function App() {
     updatingIds,
     updateItemStatus,
     retry,
-  } = useAggregatorContent(Boolean(user), selectedArchiveDate);
+  } = useAggregatorContent(Boolean(user), selectedArchiveDate, activePage);
 
   const showToast = useCallback((text: string, variant: 'success' | 'error' = 'success') => {
     if (toastTimerRef.current) {
@@ -137,6 +138,7 @@ export default function App() {
       <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {activePage === 'today' ? (
           <TodayPage
+            todayDate={todayDate}
             items={todayItems}
             loading={loading}
             error={error}

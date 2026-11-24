@@ -8,10 +8,12 @@ import {
   groupDayContent,
   isValidContentStatus,
   normalizeArabicSearch,
+  normalizeDateIndexDocument,
   normalizeFirestoreDocument,
   resolveDetailBundle,
   resolveUsernameToEmail,
   sanitizeExternalUrl,
+  sortDateCountOptions,
   sortItemsByCreatedAtDesc,
   validateLoginForm,
 } from './contentUtils';
@@ -221,4 +223,30 @@ test('countCharacters trims whitespace and handles null safely', () => {
   assert.equal(countCharacters('  مرحبا  '), 5);
   assert.equal(countCharacters(undefined), 0);
   assert.equal(countCharacters(null), 0);
+});
+
+test('normalizeDateIndexDocument and sortDateCountOptions parse aggregator_dates defensively', () => {
+  const valid = normalizeDateIndexDocument('2026-11-24', {
+    content_date: '2026-11-24',
+    count: 8,
+    updated_at: null,
+  });
+  assert.deepEqual(valid, { date: '2026-11-24', count: 8 });
+
+  // Fallback to doc ID if content_date is missing and coerce string count safely
+  const fromId = normalizeDateIndexDocument('2026-11-23', {
+    content_date: null,
+    count: '3',
+  });
+  assert.deepEqual(fromId, { date: '2026-11-23', count: 3 });
+
+  // Invalid doc ID & missing content_date returns null
+  assert.equal(normalizeDateIndexDocument('not-a-date', { count: 5 }), null);
+
+  // Sorts newest date first
+  const sorted = sortDateCountOptions([fromId!, valid!]);
+  assert.deepEqual(sorted, [
+    { date: '2026-11-24', count: 8 },
+    { date: '2026-11-23', count: 3 },
+  ]);
 });

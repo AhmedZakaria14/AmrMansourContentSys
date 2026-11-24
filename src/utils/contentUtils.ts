@@ -351,6 +351,53 @@ export function getAvailableDates(allItems: AggregatorContentItem[]): DateCountO
 }
 
 /**
+ * Defensively normalizes a document from the lightweight `aggregator_dates` index collection.
+ * Document ID is expected to be YYYY-MM-DD with fields: content_date (string), count (number), updated_at (timestamp).
+ * Returns null if no valid YYYY-MM-DD date can be determined.
+ */
+export function normalizeDateIndexDocument(
+  id: string,
+  data: Record<string, unknown> | null | undefined
+): DateCountOption | null {
+  const safeData = data && typeof data === 'object' ? data : {};
+  const rawDate =
+    typeof safeData.content_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(safeData.content_date.trim())
+      ? safeData.content_date.trim()
+      : /^\d{4}-\d{2}-\d{2}$/.test(String(id ?? '').trim())
+      ? String(id).trim()
+      : '';
+
+  if (!rawDate) {
+    return null;
+  }
+
+  const rawCount = safeData.count;
+  const parsedCount =
+    typeof rawCount === 'number' && Number.isFinite(rawCount) && rawCount >= 0
+      ? Math.floor(rawCount)
+      : typeof rawCount === 'string' && rawCount.trim() !== '' && Number.isFinite(Number(rawCount)) && Number(rawCount) >= 0
+      ? Math.floor(Number(rawCount))
+      : 0;
+
+  return {
+    date: rawDate,
+    count: parsedCount,
+  };
+}
+
+export function sortDateCountOptions(options: DateCountOption[]): DateCountOption[] {
+  const deduped = new Map<string, number>();
+  for (const opt of options) {
+    if (opt && opt.date) {
+      deduped.set(opt.date, opt.count);
+    }
+  }
+  return Array.from(deduped.entries())
+    .map(([date, count]) => ({ date, count }))
+    .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+/**
  * Counts characters in a post or script accurately.
  */
 export function countCharacters(text?: string | null): number {

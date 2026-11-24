@@ -12,15 +12,16 @@ export const FIREBASE_MESSAGING_SENDER_ID = 'PASTE_YOUR_MESSAGING_SENDER_ID';
 export const FIREBASE_APP_ID = 'PASTE_YOUR_FIREBASE_APP_ID_HERE';
 export const FIREBASE_DATABASE_ID = '';
 
-// اسم مجموعة Firestore التي يكتب فيها نظام التجميع الخارجي
+// أسماء مجموعات Firestore التي يكتب فيها نظام التجميع الخارجي
 export const FIRESTORE_COLLECTION_NAME = 'aggregator_content';
+export const FIRESTORE_DATES_COLLECTION_NAME = 'aggregator_dates';
 
 // =============================================================================
 // التهيئة الآمنة لـ Firebase Web SDK (Modular v10+)
 // =============================================================================
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
-import { doc, getDocFromServer, getFirestore, type Firestore } from 'firebase/firestore';
+import { getFirestore, type Firestore } from 'firebase/firestore';
 import provisionedConfig from '../firebase-applet-config.json';
 
 function isPlaceholder(value: string | undefined): boolean {
@@ -95,19 +96,3 @@ if (isFirebaseConfigured()) {
 export const firebaseApp = appInstance;
 export const auth = authInstance;
 export const db = dbInstance;
-
-// Startup Firestore connectivity validation
-async function testConnection() {
-  if (!dbInstance) return;
-  try {
-    await getDocFromServer(doc(dbInstance, 'test', 'connection'));
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error('Please check your Firebase configuration.');
-    }
-  }
-}
-
-if (typeof window !== 'undefined' && dbInstance) {
-  void testConnection();
-}

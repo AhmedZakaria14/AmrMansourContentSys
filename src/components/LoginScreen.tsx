@@ -90,7 +90,14 @@ export function LoginScreen({
           <div className="mb-6">
             <h2 className="text-xl font-bold text-[#0B192C]">تسجيل الدخول</h2>
             <p className="text-sm text-[#475569] mt-1.5">
-              أدخل اسم المستخدم وكلمة المرور للوصول إلى لوحة المحتوى القانوني.
+              سجّل الدخول بحساب الإدارة (اسم المستخدم{' '}
+              <code
+                dir="ltr"
+                className="font-mono text-xs text-[#0B192C] bg-[#F1F5F9] px-1.5 py-0.5 rounded whitespace-nowrap inline-block"
+              >
+                admin
+              </code>{' '}
+              وكلمة المرور) للوصول إلى لوحة المحتوى القانوني.
             </p>
           </div>
 

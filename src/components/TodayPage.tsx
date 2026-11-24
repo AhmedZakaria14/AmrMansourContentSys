@@ -16,12 +16,12 @@ import { countCharacters, groupDayContent } from '../utils/contentUtils';
 import {
   formatArabicContentDate,
   formatDurationArabic,
-  getEgyptDateString,
 } from '../utils/dateUtils';
 import { CategoryBadge, SampleDataBadge, StatusBadge } from './Badges';
 import { StatusWorkflow } from './StatusWorkflow';
 
 interface TodayPageProps {
+  todayDate: string;
   items: AggregatorContentItem[];
   loading: boolean;
   error: string | null;
@@ -38,6 +38,7 @@ interface TodayPageProps {
 type SectionFilter = 'all' | 'topics' | 'posts' | 'scripts';
 
 export function TodayPage({
+  todayDate,
   items,
   loading,
   error,
@@ -51,7 +52,6 @@ export function TodayPage({
   onGoToArchive,
 }: TodayPageProps) {
   const [activeSection, setActiveSection] = useState<SectionFilter>('all');
-  const todayDate = useMemo(() => getEgyptDateString(), []);
   const formattedToday = useMemo(() => formatArabicContentDate(todayDate), [todayDate]);
 
   const daySummary = useMemo(

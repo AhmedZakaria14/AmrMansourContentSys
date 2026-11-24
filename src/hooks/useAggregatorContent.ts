@@ -14,6 +14,7 @@ import {
 import {
   db,
   FIRESTORE_COLLECTION_NAME,
+  FIRESTORE_DATES_COLLECTION_NAME,
   isFirebaseConfigured,
 } from '../firebase-config';
 import type {
@@ -22,16 +23,21 @@ import type {
   DateCountOption,
 } from '../types/content';
 import { buildSampleContent } from '../data/sampleContent';
-import { getEgyptDateString } from '../utils/dateUtils';
 import {
   getAvailableDates,
   isValidContentStatus,
+  normalizeDateIndexDocument,
   normalizeFirestoreDocument,
+  sortDateCountOptions,
   sortItemsByCreatedAtDesc,
 } from '../utils/contentUtils';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrors';
+import { useEgyptTodayDate } from './useEgyptTodayDate';
+import type { ActivePage } from '../components/Header';
 
 export type SampleDataReason = 'unconfigured' | 'empty_collection' | null;
+
+type DatesIndexState = 'loading' | 'populated' | 'empty' | 'error';
 
 function reportStructuredFirestoreError(
   error: unknown,
@@ -78,39 +84,104 @@ function parseSnapshotDocs(
 }
 
 /**
- * Manages live Firestore reads (onSnapshot) and status-only updates for `aggregator_content`.
- * - NEVER creates or deletes documents in Firestore (writes come from external Admin SDK aggregator).
- * - Today view subscribes with `where('content_date', '==', todayEgyptDate)` + `orderBy('created_at', 'desc')`.
- * - Archive view subscribes with `where('content_date', '==', selectedArchiveDate)` when a date is chosen,
- *   plus maintains an index of available dates for the sidebar and "جميع الأيام" view.
+ * Manages live Firestore reads (onSnapshot) and status-only updates for `aggregator_content`
+ * and the lightweight `aggregator_dates` index collection.
+ * - NEVER creates or deletes documents in Firestore.
+ * - Recomputes Africa/Cairo `todayDate` every minute and on tab visibility/focus, resubscribing
+ *   the Today query automatically after midnight.
+ * - Builds the available-dates sidebar and empty-collection check from `aggregator_dates` without
+ *   scanning `aggregator_content`, falling back to `aggregator_content` only if `aggregator_dates`
+ *   is empty/missing or when the user views Archive "جميع الأيام".
  */
 export function useAggregatorContent(
   isSignedIn: boolean,
-  selectedArchiveDate: string
+  selectedArchiveDate: string,
+  activePage: ActivePage
 ) {
   const configured = isFirebaseConfigured() && db !== null;
-  const todayDate = useMemo(() => getEgyptDateString(), []);
+  const todayDate = useEgyptTodayDate();
 
   // Demo/sample fallback state (used when unconfigured or when Firestore collection is completely empty)
   const [sampleItems, setSampleItems] = useState<AggregatorContentItem[]>(() =>
     buildSampleContent()
   );
 
-  // Live Firestore states
+  // Lightweight dates index state (aggregator_dates)
+  const [datesIndexState, setDatesIndexState] = useState<DatesIndexState>('loading');
+  const [indexedDates, setIndexedDates] = useState<DateCountOption[]>([]);
+
+  // Live Firestore states for aggregator_content
   const [liveTodayItems, setLiveTodayItems] = useState<AggregatorContentItem[]>([]);
   const [liveArchiveDateItems, setLiveArchiveDateItems] = useState<AggregatorContentItem[]>([]);
   const [liveAllItems, setLiveAllItems] = useState<AggregatorContentItem[]>([]);
 
   const [todayLoading, setTodayLoading] = useState<boolean>(true);
   const [archiveLoading, setArchiveLoading] = useState<boolean>(false);
-  const [collectionChecked, setCollectionChecked] = useState<boolean>(false);
-  const [isCollectionEmpty, setIsCollectionEmpty] = useState<boolean>(false);
+  const [fallbackCollectionChecked, setFallbackCollectionChecked] = useState<boolean>(false);
+  const [fallbackCollectionEmpty, setFallbackCollectionEmpty] = useState<boolean>(false);
 
   const [error, setError] = useState<string | null>(null);
   const [updatingIds, setUpdatingIds] = useState<Record<string, boolean>>({});
   const [retryCount, setRetryCount] = useState<number>(0);
 
-  // 1. LIVE TODAY QUERY: where('content_date', '==', todayDate) + orderBy('created_at', 'desc')
+  // 1. LIGHTWEIGHT DATES INDEX QUERY: subscribe to `aggregator_dates` (1 tiny doc per day)
+  useEffect(() => {
+    if (!isSignedIn || !configured || !db) {
+      setIndexedDates([]);
+      setDatesIndexState('loading');
+      return;
+    }
+
+    setDatesIndexState('loading');
+    const datesRef = collection(db, FIRESTORE_DATES_COLLECTION_NAME);
+
+    const unsubscribe = onSnapshot(
+      datesRef,
+      (snapshot) => {
+        if (snapshot.empty) {
+          setIndexedDates([]);
+          setDatesIndexState('empty');
+          return;
+        }
+
+        const parsed: DateCountOption[] = [];
+        for (const docSnap of snapshot.docs) {
+          const item = normalizeDateIndexDocument(
+            docSnap.id,
+            docSnap.data() as Record<string, unknown> | undefined
+          );
+          if (item) {
+            parsed.push(item);
+          }
+        }
+
+        const sorted = sortDateCountOptions(parsed);
+        if (sorted.length === 0) {
+          setIndexedDates([]);
+          setDatesIndexState('empty');
+          return;
+        }
+
+        setIndexedDates(sorted);
+        setDatesIndexState('populated');
+      },
+      (snapErr) => {
+        // If aggregator_dates is unavailable or rules block it, silently fall back to scanning aggregator_content
+        reportStructuredFirestoreError(
+          snapErr,
+          OperationType.LIST,
+          FIRESTORE_DATES_COLLECTION_NAME
+        );
+        setIndexedDates([]);
+        setDatesIndexState('error');
+      }
+    );
+
+    return () => unsubscribe();
+  }, [configured, isSignedIn, retryCount]);
+
+  // 2. LIVE TODAY QUERY: where('content_date', '==', todayDate) + orderBy('created_at', 'desc')
+  // Automatically resubscribes whenever `todayDate` rolls over at Africa/Cairo midnight.
   useEffect(() => {
     if (!isSignedIn) {
       setLiveTodayItems([]);
@@ -147,7 +218,11 @@ export function useAggregatorContent(
         simpleTodayQuery,
         handleTodaySnapshot,
         (snapErr) => {
-          reportStructuredFirestoreError(snapErr, OperationType.LIST, FIRESTORE_COLLECTION_NAME);
+          reportStructuredFirestoreError(
+            snapErr,
+            OperationType.LIST,
+            FIRESTORE_COLLECTION_NAME
+          );
           setError(
             'تعذر تحميل محتوى اليوم من قاعدة البيانات. يرجى التحقق من قواعد الأمان أو إعادة المحاولة.'
           );
@@ -166,7 +241,6 @@ export function useAggregatorContent(
       orderedTodayQuery,
       handleTodaySnapshot,
       (snapErr) => {
-        // If composite index (content_date + created_at) is not created yet, fall back seamlessly
         if (!fallbackTriggered && snapErr.code === 'failed-precondition') {
           fallbackTriggered = true;
           console.warn(
@@ -177,7 +251,11 @@ export function useAggregatorContent(
           subscribeWithoutOrderBy();
           return;
         }
-        reportStructuredFirestoreError(snapErr, OperationType.LIST, FIRESTORE_COLLECTION_NAME);
+        reportStructuredFirestoreError(
+          snapErr,
+          OperationType.LIST,
+          FIRESTORE_COLLECTION_NAME
+        );
         setError(
           'تعذر الاتصال بقاعدة بيانات Firestore. يرجى التحقق من الصلاحيات أو إعادة المحاولة.'
         );
@@ -190,13 +268,35 @@ export function useAggregatorContent(
     };
   }, [configured, isSignedIn, todayDate, retryCount]);
 
-  // 2. LIVE COLLECTION OVERVIEW QUERY (for past-days sidebar, "جميع الأيام", & empty-collection detection)
+  // 3. CONDITIONAL FALLBACK / ALL-DAYS LISTENER on `aggregator_content`
+  // Only attaches when:
+  // (a) `aggregator_dates` is empty or errored (fallback so nothing breaks), OR
+  // (b) The user is explicitly viewing Archive in "جميع الأيام" mode (selectedArchiveDate === '').
+  const needsAllContentListener =
+    isSignedIn &&
+    configured &&
+    db !== null &&
+    (datesIndexState === 'empty' ||
+      datesIndexState === 'error' ||
+      (activePage === 'archive' && selectedArchiveDate === ''));
+
   useEffect(() => {
-    if (!isSignedIn || !configured || !db) {
-      setLiveAllItems([]);
-      setCollectionChecked(false);
-      setIsCollectionEmpty(false);
+    if (!needsAllContentListener || !db) {
+      if (datesIndexState === 'populated') {
+        setFallbackCollectionChecked(false);
+        setFallbackCollectionEmpty(false);
+      }
+      if (!isSignedIn || !configured) {
+        setLiveAllItems([]);
+        setFallbackCollectionChecked(false);
+        setFallbackCollectionEmpty(false);
+      }
       return;
+    }
+
+    const isArchiveAllView = activePage === 'archive' && selectedArchiveDate === '';
+    if (isArchiveAllView) {
+      setArchiveLoading(true);
     }
 
     const collectionRef = collection(db, FIRESTORE_COLLECTION_NAME);
@@ -204,9 +304,12 @@ export function useAggregatorContent(
     let fallbackTriggered = false;
 
     const handleAllSnapshot = (snapshot: QuerySnapshot<DocumentData>) => {
-      setIsCollectionEmpty(snapshot.empty);
-      setCollectionChecked(true);
+      setFallbackCollectionEmpty(snapshot.empty);
+      setFallbackCollectionChecked(true);
       setLiveAllItems(parseSnapshotDocs(snapshot, todayDate));
+      if (isArchiveAllView) {
+        setArchiveLoading(false);
+      }
     };
 
     const subscribeUnordered = () => {
@@ -214,8 +317,15 @@ export function useAggregatorContent(
         collectionRef,
         handleAllSnapshot,
         (snapErr) => {
-          reportStructuredFirestoreError(snapErr, OperationType.LIST, FIRESTORE_COLLECTION_NAME);
-          setCollectionChecked(true);
+          reportStructuredFirestoreError(
+            snapErr,
+            OperationType.LIST,
+            FIRESTORE_COLLECTION_NAME
+          );
+          setFallbackCollectionChecked(true);
+          if (isArchiveAllView) {
+            setArchiveLoading(false);
+          }
         }
       );
     };
@@ -231,21 +341,39 @@ export function useAggregatorContent(
           subscribeUnordered();
           return;
         }
-        reportStructuredFirestoreError(snapErr, OperationType.LIST, FIRESTORE_COLLECTION_NAME);
-        setCollectionChecked(true);
+        reportStructuredFirestoreError(
+          snapErr,
+          OperationType.LIST,
+          FIRESTORE_COLLECTION_NAME
+        );
+        setFallbackCollectionChecked(true);
+        if (isArchiveAllView) {
+          setArchiveLoading(false);
+        }
       }
     );
 
     return () => {
       if (activeUnsubscribe) activeUnsubscribe();
     };
-  }, [configured, isSignedIn, todayDate, retryCount]);
+  }, [
+    needsAllContentListener,
+    configured,
+    isSignedIn,
+    todayDate,
+    retryCount,
+    datesIndexState,
+    activePage,
+    selectedArchiveDate,
+  ]);
 
-  // 3. LIVE ARCHIVE DATE QUERY: where('content_date', '==', selectedArchiveDate) when a specific date is selected
+  // 4. LIVE ARCHIVE DATE QUERY: where('content_date', '==', selectedArchiveDate) when a specific date is chosen
   useEffect(() => {
     if (!isSignedIn || !configured || !db || !selectedArchiveDate) {
       setLiveArchiveDateItems([]);
-      setArchiveLoading(false);
+      if (selectedArchiveDate === '' && activePage !== 'archive') {
+        setArchiveLoading(false);
+      }
       return;
     }
 
@@ -268,7 +396,11 @@ export function useAggregatorContent(
         simpleDateQuery,
         handleArchiveDateSnapshot,
         (snapErr) => {
-          reportStructuredFirestoreError(snapErr, OperationType.LIST, FIRESTORE_COLLECTION_NAME);
+          reportStructuredFirestoreError(
+            snapErr,
+            OperationType.LIST,
+            FIRESTORE_COLLECTION_NAME
+          );
           setArchiveLoading(false);
         }
       );
@@ -290,7 +422,11 @@ export function useAggregatorContent(
           subscribeWithoutOrderBy();
           return;
         }
-        reportStructuredFirestoreError(snapErr, OperationType.LIST, FIRESTORE_COLLECTION_NAME);
+        reportStructuredFirestoreError(
+          snapErr,
+          OperationType.LIST,
+          FIRESTORE_COLLECTION_NAME
+        );
         setArchiveLoading(false);
       }
     );
@@ -298,17 +434,21 @@ export function useAggregatorContent(
     return () => {
       if (activeUnsubscribe) activeUnsubscribe();
     };
-  }, [configured, isSignedIn, selectedArchiveDate, retryCount]);
+  }, [configured, isSignedIn, selectedArchiveDate, activePage, retryCount]);
 
-  // Determine whether demo sample data should be displayed
-  const isSampleData = !configured || (collectionChecked && isCollectionEmpty);
+  // Empty-collection check: prefer aggregator_dates index; fall back to aggregator_content only if index is empty/missing
+  const isCollectionEmpty =
+    datesIndexState === 'populated'
+      ? false
+      : fallbackCollectionChecked && fallbackCollectionEmpty;
+
+  const isSampleData = !configured || isCollectionEmpty;
   const sampleReason: SampleDataReason = !configured
     ? 'unconfigured'
-    : collectionChecked && isCollectionEmpty
+    : isCollectionEmpty
     ? 'empty_collection'
     : null;
 
-  // Datasets exposed to Today, Archive, and DetailModal
   const todayItems = useMemo(() => {
     if (isSampleData) {
       return sampleItems.filter((item) => item.content_date === todayDate);
@@ -337,11 +477,24 @@ export function useAggregatorContent(
   }, [isSampleData, sampleItems, liveAllItems, liveTodayItems, liveArchiveDateItems]);
 
   const availableDates: DateCountOption[] = useMemo(() => {
-    const source = isSampleData ? sampleItems : liveAllItems;
-    return getAvailableDates(source);
-  }, [isSampleData, sampleItems, liveAllItems]);
+    if (isSampleData) {
+      return getAvailableDates(sampleItems);
+    }
+    if (datesIndexState === 'populated') {
+      return indexedDates;
+    }
+    return getAvailableDates(liveAllItems);
+  }, [isSampleData, sampleItems, datesIndexState, indexedDates, liveAllItems]);
 
-  const totalAllDaysCount = isSampleData ? sampleItems.length : liveAllItems.length;
+  const totalAllDaysCount = useMemo(() => {
+    if (isSampleData) {
+      return sampleItems.length;
+    }
+    if (datesIndexState === 'populated') {
+      return indexedDates.reduce((sum, entry) => sum + entry.count, 0);
+    }
+    return liveAllItems.length;
+  }, [isSampleData, sampleItems, datesIndexState, indexedDates, liveAllItems]);
 
   // STATUS-ONLY UPDATE: updates ONLY { status } field via updateDoc, never touches other fields
   const updateItemStatus = useCallback(
@@ -363,7 +516,6 @@ export function useAggregatorContent(
       setUpdatingIds((prev) => ({ ...prev, [itemId]: true }));
       try {
         const docRef = doc(db, FIRESTORE_COLLECTION_NAME, itemId);
-        // Strictly update ONLY the "status" field (enforced by Firestore Security Rules)
         await updateDoc(docRef, { status: nextStatus });
 
         const applyOptimistic = (prev: AggregatorContentItem[]) =>
@@ -399,6 +551,7 @@ export function useAggregatorContent(
   }, []);
 
   return {
+    todayDate,
     todayItems,
     archiveItems,
     allItemsForLookup,
